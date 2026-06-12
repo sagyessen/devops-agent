@@ -27,7 +27,12 @@
       "Bash(gh secret *)",
       "Bash(gh auth *)",
       "Bash(git push --force*)",
-      "Bash(git config *hooksPath*)"
+      "Bash(git config *hooksPath*)",
+      "Write(.env)",
+      "Write(.env.*)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Bash(make guardrails-generate*)"
     ],
     "ask": [
       "Bash(git push*)",

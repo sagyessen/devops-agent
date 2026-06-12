@@ -60,7 +60,38 @@ FORBIDDEN_PATTERNS: tuple[tuple[str, str], ...] = (
     (_CMD + r"chmod\b.*\+s", "setuid is forbidden"),
     (_CMD + r"(ssh|scp|sftp)\b", "remote shell access is forbidden"),
     (_CMD + r"ln\s+-s", "creating symlinks is forbidden (guardrail bypass vector)"),
+    (r"guardrails-generate", "manifest regeneration is human-only"),
+    (r"(^|[\s'\"/])\.env(?!\.example)(\.|\b)", "touching .env files is forbidden"),
 )
+
+# Secret-shaped content may never be written to any file or echoed by any command.
+PLACEHOLDER = re.compile(
+    r"(?i)(example|placeholder|changeme|your[-_]?|dummy|redacted|fake|sample|<[^>]*>|\$\{|xxx)"
+)
+SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\b(AKIA|ASIA)[0-9A-Z]{16}\b"), "AWS access key id"),
+    (re.compile(r"(?i)(aws_)?secret_access_key\s*[=:]\s*['\"]?[0-9A-Za-z/+=]{30,}"), "AWS secret key"),
+    (re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}"), "Anthropic API key"),
+    (re.compile(r"\bsk-[A-Za-z0-9_-]{32,}"), "API key (sk- prefix)"),
+    (re.compile(r"\b(ghp|gho|ghs|ghu|ghr)_[A-Za-z0-9]{30,}|\bgithub_pat_[A-Za-z0-9_]{22,}"), "GitHub token"),
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "private key material"),
+    (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"), "Slack token"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}"), "JWT"),
+    (re.compile(r"(?i)\b(password|passwd|api[_-]?key|auth[_-]?token|access[_-]?token)\b\s*[=:]\s*['\"][^'\"\s]{8,}['\"]"), "hardcoded credential"),
+)
+
+
+def find_secret(text: str) -> str | None:
+    for pattern, label in SECRET_PATTERNS:
+        m = pattern.search(text)
+        if m is None:
+            continue
+        # tolerate documented placeholders around the match
+        window = text[max(0, m.start() - 30): m.end() + 30]
+        if label == "hardcoded credential" and PLACEHOLDER.search(window):
+            continue
+        return label
+    return None
 
 FILE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 
@@ -93,6 +124,9 @@ def check_file_tool(tool_input: dict, cwd: Path) -> None:
     for key in ("file_path", "notebook_path", "path"):
         raw = tool_input.get(key)
         if isinstance(raw, str) and raw:
+            base = Path(raw).name
+            if base.startswith(".env") and base != ".env.example":
+                deny(f"writing .env files is forbidden: {raw}")
             if is_protected_path(raw, cwd):
                 deny(f"writes to protected or out-of-repo path are forbidden: {raw}")
     edits = tool_input.get("edits")
@@ -101,6 +135,26 @@ def check_file_tool(tool_input: dict, cwd: Path) -> None:
             raw = e.get("file_path") if isinstance(e, dict) else None
             if isinstance(raw, str) and raw and is_protected_path(raw, cwd):
                 deny(f"writes to protected path are forbidden: {raw}")
+    # content scan: no secret-shaped strings may be written anywhere
+    for label in _scan_strings(tool_input):
+        deny(f"content contains a {label}; secrets must never be written to the repo")
+
+
+def _scan_strings(obj: object) -> list[str]:
+    found: list[str] = []
+    if isinstance(obj, str):
+        hit = find_secret(obj)
+        if hit:
+            found.append(hit)
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in ("file_path", "notebook_path", "path", "old_string", "old_str"):
+                continue  # scan what gets written, not what gets replaced
+            found.extend(_scan_strings(v))
+    elif isinstance(obj, list):
+        for item in obj:
+            found.extend(_scan_strings(item))
+    return found
 
 
 def check_bash(command: str) -> None:
@@ -111,6 +165,9 @@ def check_bash(command: str) -> None:
     for pattern, reason in FORBIDDEN_PATTERNS:
         if re.search(pattern, lowered):
             deny(reason)
+    hit = find_secret(command)
+    if hit:
+        deny(f"command contains a {hit}; secrets must never enter the repo or shell history")
 
 
 def main() -> None:

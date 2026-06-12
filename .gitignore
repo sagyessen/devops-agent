@@ -1,0 +1,26 @@
+# secrets & local config — never commit
+.env
+.env.*
+!.env.example
+config/local.yaml
+*.pem
+*.key
+
+# runtime data (compose volume content if ever bind-mounted)
+/data/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# editors / OS
+.idea/
+.vscode/
+.DS_Store
