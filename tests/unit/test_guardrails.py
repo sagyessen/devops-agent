@@ -153,3 +153,56 @@ def test_garbage_stdin_fails_closed() -> None:
         [sys.executable, str(HOOK)], input="not-json", capture_output=True, text=True
     )
     assert res.returncode == 2
+
+
+# ---------- secret-writing prevention (v2) ----------
+# Secret-shaped strings are assembled at runtime (concatenation) so this file itself
+# never contains a literal that gitleaks or the hook would flag in the repo.
+
+def _fake_secrets() -> list[str]:
+    return [
+        "aws_access_key_id = " + "AKIA" + "IOSFODNN7EXAMPLE",
+        'AWS_SECRET_ACCESS_KEY="' + "wJalrXUtnFEMI/K7MDENG/" + "bPxRfiCYEXAMPLEKEY" + '"',
+        "key = '" + "sk-ant-" + "api03-AbCdEfGhIjKlMnOpQrStUvWx" + "'",
+        "token = " + "ghp_" + "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789",
+        "-----BEGIN RSA " + "PRIVATE KEY-----" + "\nMIIE...",
+        "slack = " + "xoxb-" + "1234567890-abcdefghij",
+        'password = "' + "Hunter2Hunter2!" + '"',
+    ]
+
+
+@pytest.mark.parametrize("content", _fake_secrets())
+def test_write_with_secret_content_is_blocked(content: str) -> None:
+    assert_blocked(run_hook("Write", {"file_path": "src/devops_agent/settings.py", "content": content}))
+    assert_blocked(run_hook("Edit", {"file_path": "src/devops_agent/settings.py",
+                                     "old_string": "x", "new_string": content}))
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        'ANTHROPIC_API_KEY=sk-ant-your-key-here',          # documented placeholder
+        'password = "changeme-placeholder"',                # placeholder context
+        'account_id = "123456789012"',                      # fixture account
+        'pattern = r"AKIA[0-9A-Z]{16}"',                    # the redaction regex itself
+    ],
+)
+def test_placeholders_and_patterns_are_allowed(content: str) -> None:
+    assert_allowed(run_hook("Write", {"file_path": "tests/unit/test_redaction.py", "content": content}))
+
+
+def test_env_file_writes_blocked_but_example_allowed() -> None:
+    assert_blocked(run_hook("Write", {"file_path": ".env", "content": "X=1"}))
+    assert_blocked(run_hook("Write", {"file_path": ".env.local", "content": "X=1"}))
+    assert_blocked(run_hook("Bash", {"command": "echo KEY=1 >> .env"}))
+    assert_blocked(run_hook("Bash", {"command": "cat .env"}))
+    assert_allowed(run_hook("Write", {"file_path": ".env.example", "content": "ANTHROPIC_API_KEY=sk-ant-your-key-here"}))
+
+
+def test_bash_with_secret_content_is_blocked() -> None:
+    cmd = "echo " + "AKIA" + "IOSFODNN7EXAMPLE" + " > /tmp/x"
+    assert_blocked(run_hook("Bash", {"command": cmd}))
+
+
+def test_manifest_regeneration_is_human_only() -> None:
+    assert_blocked(run_hook("Bash", {"command": "make guardrails-generate"}))

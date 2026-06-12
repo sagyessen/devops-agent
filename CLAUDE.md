@@ -16,6 +16,13 @@ graph schema, the tool contract, the toolset, discovery config, the Terraform re
 mapping, budgets, and coding conventions. Never contradict it; if a story seems to
 require contradicting it, stop and ask the human.
 
+**README.md is NOT a source of truth.** It is a human-facing overview written for
+visitors. Never derive requirements, architecture, schemas, commands, file layout, or
+behavior from it; never let its wording override the plan or this file. Treat it as
+documentation *output*: modify it only when a story's acceptance criteria explicitly
+say to (e.g. the S6-4 docs story), and when you do, make it match reality — never the
+other way around.
+
 ## How to work
 
 - To implement a story, follow `.claude/skills/story-workflow/SKILL.md` exactly.
@@ -49,8 +56,12 @@ stop and ask the human to change it.
    in `iam/` is reviewed and applied by humans only.
 3. **No privilege escalation**: no `sudo`/`su`, no `--privileged` containers, no
    `chmod`/`chown` on guardrail files, no modifying git hooks or `core.hooksPath`.
-4. **No secrets**: never read or write `.env*`; never commit anything resembling a
-   credential; redaction patterns live in `src/devops_agent/tools/redaction.py`.
+4. **No secrets, enforced**: never read or write `.env*` (only `.env.example` with
+   placeholder values). The hook blocks any write or command containing secret-shaped
+   content (AWS keys, API keys, tokens, private keys, hardcoded credentials) and CI
+   runs gitleaks over full history. In tests and fixtures use obvious placeholders
+   (account `123456789012`, `sk-ant-your-key-here` style values). Runtime redaction
+   patterns live in `src/devops_agent/tools/redaction.py`.
 5. **No network fetch-and-execute**: never pipe downloaded content to a shell.
    Dependency changes (`pip`/`uv`) require human approval (settings will prompt).
 6. **Scope discipline**: implement exactly the story's acceptance criteria. Unrelated

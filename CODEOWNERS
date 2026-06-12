@@ -1,8 +1,8 @@
 # Guardrail and security-critical paths require human review.
 # Replace @OWNER with the responsible human's GitHub handle(s).
-/.claude/                          @OWNER
-/iam/                              @OWNER
-/CODEOWNERS                        @OWNER
-/scripts/guardrails.sh             @OWNER
-/.github/workflows/guardrails.yml  @OWNER
-/.github/workflows/               @OWNER
+/.claude/                          @sagyessen
+/iam/                              @sagyessen
+/CODEOWNERS                        @sagyessen
+/scripts/guardrails.sh             @sagyessen
+/.github/workflows/guardrails.yml  @sagyessen
+/.github/workflows/                @sagyessen
