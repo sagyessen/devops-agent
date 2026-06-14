@@ -41,7 +41,8 @@
       "Bash(uv *)",
       "Bash(npm *)",
       "WebFetch",
-      "WebSearch"
+      "WebSearch",
+      "mcp__github__*"
     ],
     "allow": [
       "Bash(make *)",
