@@ -1,0 +1,18 @@
+# Copy to local.yaml (git-ignored) to override defaults for your environment.
+# Environment variables (DEVOPS_AGENT_*) take precedence over this file.
+
+# anthropic_api_key: "sk-ant-your-key-here"
+# aws_profile: "my-profile"
+
+# budgets:
+#   max_turns: 20
+
+# discovery:
+#   terraform:
+#     backends:
+#       - bucket: my-tf-states
+#         region: eu-central-1
+#         prefix: ""
+#         state_glob: "*/**/terraform.tfstate"
+#         env_from: "^(?P<env>[^/]+)/"
+#         stack_from: "^[^/]+/(?P<stack>.+)/terraform.tfstate$"

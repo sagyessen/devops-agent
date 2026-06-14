@@ -1,0 +1,13 @@
+anthropic_api_key: ""
+aws_profile: "default"
+
+budgets:
+  max_turns: 15
+  max_input_tokens: 150000
+  max_output_tokens: 8000
+  athena_bytes_scanned: 1073741824  # 1 GiB
+  tool_timeout_s: 60
+
+discovery:
+  terraform:
+    backends: []
